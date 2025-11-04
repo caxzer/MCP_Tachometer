@@ -53,6 +53,16 @@ extern uint32_t __STACK_TOP;
 
 //*****************************************************************************
 //
+// External declaration for the interrupt handler used by the application.
+// VERY IMPORTANT!!!
+//*****************************************************************************
+//extern void UARTIntHandler(void);
+//extern void Timer0IntHandler(void);
+extern void motor_interrupt_handler(void);
+extern void timer_interrupt_handler(void);
+
+//*****************************************************************************
+//
 // The vector table.  Note that the proper constructs must be placed on this to
 // ensure that it ends up at physical address 0x0000.0000 or at the start of
 // the program if located at a start address other than 0.
@@ -97,7 +107,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // ADC Sequence 2
     IntDefaultHandler,                      // ADC Sequence 3
     IntDefaultHandler,                      // Watchdog timer
-    IntDefaultHandler,                      // Timer 0 subtimer A
+    timer_interrupt_handler,                      // Timer 0 subtimer A
     IntDefaultHandler,                      // Timer 0 subtimer B
     IntDefaultHandler,                      // Timer 1 subtimer A
     IntDefaultHandler,                      // Timer 1 subtimer B
@@ -154,7 +164,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // GPIO Port N
     0,                                      // Reserved
     IntDefaultHandler,                      // Tamper
-    IntDefaultHandler,                      // GPIO Port P (Summary or P0)
+    motor_interrupt_handler,                      // GPIO Port P (Summary or P0)
     IntDefaultHandler,                      // GPIO Port P1
     IntDefaultHandler,                      // GPIO Port P2
     IntDefaultHandler,                      // GPIO Port P3
