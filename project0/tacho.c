@@ -92,7 +92,7 @@ void motor_interrupt_handler(){
 // Once the window period of 100 ms has been reached, timer interrupt !
 void timer_interrupt_handler(void){
     // Clear interrupt flag 
-    TimerIntClear(TIMER1_BASE, TIMER_TIMB_TIMEOUT);
+    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
     count = edgeCountWindowS1;
 
     // One redundant signal?
