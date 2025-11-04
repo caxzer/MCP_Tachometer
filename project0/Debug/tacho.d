@@ -18,6 +18,7 @@ tacho.obj: C:/ti/TivaWare_C_Series-2.2.0.295/driverlib/interrupt.h
 tacho.obj: C:/ti/TivaWare_C_Series-2.2.0.295/utils/uartstdio.h
 tacho.obj: C:/ti/ti-cgt-arm_18.12.2.LTS/include/stdarg.h
 tacho.obj: C:/ti/TivaWare_C_Series-2.2.0.295/driverlib/timer.h
+tacho.obj: C:/ti/TivaWare_C_Series-2.2.0.295/inc/hw_ints.h
 
 ../tacho.c:
 
@@ -54,4 +55,6 @@ C:/ti/TivaWare_C_Series-2.2.0.295/utils/uartstdio.h:
 C:/ti/ti-cgt-arm_18.12.2.LTS/include/stdarg.h:
 
 C:/ti/TivaWare_C_Series-2.2.0.295/driverlib/timer.h:
+
+C:/ti/TivaWare_C_Series-2.2.0.295/inc/hw_ints.h:
 
