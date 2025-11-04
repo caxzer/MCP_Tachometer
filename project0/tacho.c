@@ -7,6 +7,8 @@
 #include "driverlib/interrupt.h"
 #include "utils/uartstdio.h"
 #include "driverlib/timer.h"
+#include "inc/hw_ints.h"
+
 
 // Macros 
 #define MOTOR_S1 GPIO_PIN_0
@@ -34,9 +36,6 @@ void motor_interrupt_handler(void);
 void timer_interrupt_handler(void);
 void calc_speed_dir(void);
 
-
-
-
 // Inputs from motors at Port P
 void init_motor_ports_interrupts(void){
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOP);
@@ -48,13 +47,16 @@ void init_motor_ports_interrupts(void){
     // Set Interrupt type
     GPIOIntTypeSet(MOTOR_PORT, MOTOR_S1 | MOTOR_S2, GPIO_BOTH_EDGES);
 
+    // Clear pending interrupts
+    GPIOIntClear(MOTOR_PORT, GPIOIntStatus(MOTOR_PORT, false)); 
+
     // Define Interupt handler for this PORT 
     GPIOIntRegister(MOTOR_PORT, motor_interrupt_handler); // NOTE: function pointer passed, not function itself!
 
     // Enable interrupt
     GPIOIntEnable(MOTOR_PORT, MOTOR_S1|MOTOR_S2);
 
-    //IntEnable(INT_GPIOP);
+    IntEnable(INT_GPIOP0);
 }
 
 void motor_interrupt_handler(){
@@ -62,14 +64,14 @@ void motor_interrupt_handler(){
     uint32_t stat = GPIOIntStatus(MOTOR_PORT,true);     // Get current interrupt status
     
     if (stat & MOTOR_S1){
-        if(GPIOPinRead(MOTOR_PORT, MOTOR_S1)){
+        if(GPIOPinRead(MOTOR_PORT, MOTOR_S1)){  // Rising edge
             edgeCountWindowS1++;
             thisS1 = true;
         } else thisS1 = false;  // Falling edge
     }
-    else{
-        if(GPIOPinRead(MOTOR_PORT, MOTOR_S2)){
-            edgeCountWindowS2++;
+    if (stat & MOTOR_S2){
+        if(GPIOPinRead(MOTOR_PORT, MOTOR_S2)){  // Rising edge
+            edgeCountWindowS2++;   
             thisS2 = true;
         } else thisS2 = false;  // Falling edge
     }
@@ -90,7 +92,7 @@ void motor_interrupt_handler(){
 // Once the window period of 100 ms has been reached, timer interrupt !
 void timer_interrupt_handler(void){
     // Clear interrupt flag 
-    TimerIntClear(TIMER1_BASE, TIMER_TIMB_TIMEOUT);
+    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
     count = edgeCountWindowS1;
 
     // One redundant signal?
@@ -102,8 +104,10 @@ void calc_speed_dir(){
     rpm = (count / 0.1f ) * 2.0f;
     float speed = rpm * CIRCUMFERENCE * 0.06f;
 
-    UARTprintf("RPM: %.2f, Speed: %.2f, Direction: %s\n", rpm, speed, directionForwards ? "V":"R"); 
-    
+    //UARTprintf("RPM: %.2f, Speed: %.2f, Direction: %s\n", rpm, speed, directionForwards ? "V":"R"); 
+    int rpm_i = (int)rpm;
+    int speed_i = (int)(speed * 100); // two decimals
+    UARTprintf("RPM: %d, Speed: %d.%02d km/h, Direction: %s\n",rpm_i, speed_i / 100,speed_i % 100, directionForwards ? "V" : "R");
 }
 
 
