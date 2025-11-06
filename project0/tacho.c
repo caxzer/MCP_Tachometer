@@ -24,6 +24,7 @@ volatile float rpm = 0.0f;
 volatile bool directionForwards = true;
 volatile bool prevS1 = false, prevS2 = false, thisS1 = false, thisS2 = false; // Signal flag for direction calculation
 uint32_t count = 0;
+uint32_t speed = 0;
 
 // convert timer ticks to seconds
 /*static inline float ticks_to_second(uint32_t ticks){
@@ -102,12 +103,12 @@ void timer_interrupt_handler(void){
 
 void calc_speed_dir(){
     rpm = (count / 0.1f ) * (60.0f / 2.0f); // number of revolutions per minute
-    float speed = rpm * CIRCUMFERENCE * 0.06f;
+    float speed_f = rpm * CIRCUMFERENCE * 0.06f;
 
     //UARTprintf("RPM: %.2f, Speed: %.2f, Direction: %s\n", rpm, speed, directionForwards ? "V":"R"); 
     int rpm_i = (int)rpm;
-    int speed_i = (int)(speed * 100); // two decimals
-    UARTprintf("RPM: %d, Speed: %d.%02d km/h, Direction: %s\n",rpm_i, speed_i / 100,speed_i % 100, directionForwards ? "V" : "R");
+    speed = (int)(speed_f * 100); // two decimals
+    UARTprintf("RPM: %d, Speed: %d.%02d km/h, Direction: %s\n",rpm_i, speed / 100,speed % 100, directionForwards ? "V" : "R");
 }
 
 

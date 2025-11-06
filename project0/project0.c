@@ -13,6 +13,7 @@
 
 // Sub-modules
 #include "tacho.h"
+#include "display.h"
 
 // Macros
 #define WINDOW_MS        100
@@ -32,6 +33,7 @@ __error__(char *pcFilename, uint32_t ui32Line)
 // Global variables
 uint32_t sysclk;
 uint32_t window_timer_period;
+
 
 // Function prototype declarations
 void init_clock(void);
@@ -96,13 +98,21 @@ int main(void)
     init_timer();                   // Setup timer
     IntMasterEnable();              // Crucial: EN NVIC for whole board
     init_timer_interrupt();         // Enable interrupts for timer
-    
+    init_ports_display();           // Init Port L for Display Control and Port M for Display Data
+	configure_display_controller_large();  // initalize and configuration
+
     // Check for UART functionality, startup message
     UARTprintf("KMZ60 RPM Measurement started. \n");
     
+    // Clear screen with black background
+    fill_rect(0, 0, MAX_X, MAX_Y, BLACK);
+    draw_gauge_ticks();
+
     // Loop Forever
     while(1)
     {   
-        calc_speed_dir();   // Introduce delay?
+        calc_speed_dir();
+        draw_needle_gauge(speed, gauge_x, gauge_y, gauge_width, gauge_height);
+        SysCtlDelay(sysclk / 10); // small delay
     }
 }
