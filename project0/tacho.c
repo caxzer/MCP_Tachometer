@@ -15,7 +15,7 @@
 #define MOTOR_S2 GPIO_PIN_1
 #define MOTOR_PORT GPIO_PORTP_BASE
 #define WINDOW_PERIOD 100   // millisecond
-#define CIRCUMFERENCE 0.0188f // Circumference of motor wheel on the board, adjust according to max speed!
+#define CIRCUMFERENCE 0.444f // Circumference of motor wheel on the board, adjust according to max speed!
 
 // Global variables
 volatile uint32_t edgeCountWindowS1 = 0; // Number of pulses in this time frame
@@ -101,7 +101,7 @@ void timer_interrupt_handler(void){
 }
 
 void calc_speed_dir(){
-    rpm = (count / 0.1f ) * 2.0f;
+    rpm = (count / 0.1f ) * (60.0f / 2.0f); // number of revolutions per minute
     float speed = rpm * CIRCUMFERENCE * 0.06f;
 
     //UARTprintf("RPM: %.2f, Speed: %.2f, Direction: %s\n", rpm, speed, directionForwards ? "V":"R"); 

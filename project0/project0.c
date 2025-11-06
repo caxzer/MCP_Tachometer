@@ -11,7 +11,6 @@
 #include "driverlib/pin_map.h"
 #include "inc/hw_ints.h"
 
-
 // Sub-modules
 #include "tacho.h"
 
@@ -51,7 +50,7 @@ void init_timer(void){
     // Timer for window
     // Enable Timer 0
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
-    // Wait for Timer 1 to be ready
+    // Wait for Timer 0 to be ready
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0)){};
     window_timer_period = sysclk / (1000 / WINDOW_MS);
 }
@@ -91,25 +90,19 @@ void init_uart(void){
 int main(void)
 {
     // Setup phase
-    init_clock();
-    init_uart();
-    init_motor_ports_interrupts();
-    init_timer();
-
-    IntMasterEnable();
-
-    init_timer_interrupt();
+    init_clock();                   // Initialise system clock
+    init_uart();                    // Setup UART connection to PC for Debugging
+    init_motor_ports_interrupts();  // Setup ports for motors and enable their interrupts
+    init_timer();                   // Setup timer
+    IntMasterEnable();              // Crucial: EN NVIC for whole board
+    init_timer_interrupt();         // Enable interrupts for timer
     
-
+    // Check for UART functionality, startup message
     UARTprintf("KMZ60 RPM Measurement started. \n");
     
     // Loop Forever
     while(1)
     {   
-        //uint32_t val = GPIOPinRead(MOTOR_PORT, MOTOR_S1 | MOTOR_S2);
-        //UARTprintf("S1:%d  S2:%d\n", (val & MOTOR_S1)?1:0, (val & MOTOR_S2)?1:0);
-        //SysCtlDelay(sysclk/30);
-        calc_speed_dir();
-       
+        calc_speed_dir();   // Introduce delay?
     }
 }
