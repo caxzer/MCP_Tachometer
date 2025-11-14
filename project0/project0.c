@@ -11,9 +11,9 @@
 #include "driverlib/pin_map.h"
 #include "inc/hw_ints.h"
 
-
 // Sub-modules
 #include "tacho.h"
+#include "display.h"
 
 // Macros
 #define WINDOW_MS        100
@@ -34,6 +34,7 @@ __error__(char *pcFilename, uint32_t ui32Line)
 uint32_t sysclk;
 uint32_t window_timer_period;
 
+
 // Function prototype declarations
 void init_clock(void);
 void init_uart(void);
@@ -51,7 +52,7 @@ void init_timer(void){
     // Timer for window
     // Enable Timer 0
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
-    // Wait for Timer 1 to be ready
+    // Wait for Timer 0 to be ready
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0)){};
     window_timer_period = sysclk / (1000 / WINDOW_MS);
 }
@@ -91,25 +92,29 @@ void init_uart(void){
 int main(void)
 {
     // Setup phase
-    init_clock();
-    init_uart();
-    init_motor_ports_interrupts();
-    init_timer();
+    init_clock();                   // Initialise system clock
+    init_uart();                    // Setup UART connection to PC for Debugging
+    init_motor_ports_interrupts();  // Setup ports for motors and enable their interrupts
+    init_timer();                   // Setup timer
+    IntMasterEnable();              // Crucial: EN NVIC for whole board
+    init_timer_interrupt();         // Enable interrupts for timer
+    init_ports_display();           // Init Port L for Display Control and Port M for Display Data
+	configure_display_controller_large();  // initalize and configuration
 
-    IntMasterEnable();
-
-    init_timer_interrupt();
-    
-
+    // Check for UART functionality, startup message
     UARTprintf("KMZ60 RPM Measurement started. \n");
     
+    // Clear screen with black background
+    fill_rect(0, 0, MAX_X, MAX_Y, BLACK);
+    draw_gauge_ticks();
+
     // Loop Forever
     while(1)
     {   
-        //uint32_t val = GPIOPinRead(MOTOR_PORT, MOTOR_S1 | MOTOR_S2);
-        //UARTprintf("S1:%d  S2:%d\n", (val & MOTOR_S1)?1:0, (val & MOTOR_S2)?1:0);
-        //SysCtlDelay(sysclk/30);
         calc_speed_dir();
-       
+        draw_needle_gauge(speed);
+        draw_gauge_ticks();
+        draw_odometer(distance_total);
+        draw_direction(directionForwards);
     }
 }

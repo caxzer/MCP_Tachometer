@@ -15,7 +15,7 @@
 #define MOTOR_S2 GPIO_PIN_1
 #define MOTOR_PORT GPIO_PORTP_BASE
 #define WINDOW_PERIOD 100   // millisecond
-#define CIRCUMFERENCE 0.0188f // Circumference of motor wheel on the board, adjust according to max speed!
+#define CIRCUMFERENCE 0.444f // Circumference of motor wheel on the board, adjust according to max speed!
 
 // Global variables
 volatile uint32_t edgeCountWindowS1 = 0; // Number of pulses in this time frame
@@ -23,7 +23,11 @@ volatile uint32_t edgeCountWindowS2 = 0;
 volatile float rpm = 0.0f;
 volatile bool directionForwards = true;
 volatile bool prevS1 = false, prevS2 = false, thisS1 = false, thisS2 = false; // Signal flag for direction calculation
-uint32_t count = 0;
+volatile uint32_t count = 0;
+volatile uint32_t speed = 0;
+volatile bool calc_flag = false;
+float distance_total = 0.0f;
+
 
 // convert timer ticks to seconds
 /*static inline float ticks_to_second(uint32_t ticks){
@@ -98,16 +102,36 @@ void timer_interrupt_handler(void){
     // One redundant signal?
     edgeCountWindowS1 = 0;
     edgeCountWindowS2 = 0;
+    calc_flag = true;
 }
 
 void calc_speed_dir(){
-    rpm = (count / 0.1f ) * 2.0f;
-    float speed = rpm * CIRCUMFERENCE * 0.06f;
+    while(!calc_flag){} // do this every 100ms
+
+    rpm = (count / 0.1f ) * (60.0f / 2.0f); // number of revolutions per minute
+    float speed_f = rpm * CIRCUMFERENCE * 0.06f;
 
     //UARTprintf("RPM: %.2f, Speed: %.2f, Direction: %s\n", rpm, speed, directionForwards ? "V":"R"); 
     int rpm_i = (int)rpm;
-    int speed_i = (int)(speed * 100); // two decimals
-    UARTprintf("RPM: %d, Speed: %d.%02d km/h, Direction: %s\n",rpm_i, speed_i / 100,speed_i % 100, directionForwards ? "V" : "R");
+    speed = (int)(speed_f * 100); // two decimals, in kmh
+
+    // Calculate distance travelled
+    float delta_distance = 0;
+    delta_distance = (speed_f / 3600.0f) * 0.1f;  //km
+    distance_total += delta_distance;
+    int distance_int = (int)distance_total;                // whole km
+    int distance_frac = (int)((distance_total - distance_int) * 100); // two decimals
+
+    UARTprintf( "RPM: %d, Speed: %d.%02d km/h, Direction: %s, Distance: %03d,%02d km\n",
+        rpm_i,
+        speed / 100,
+        speed % 100,
+        directionForwards ? "V" : "R",
+        distance_int,
+        distance_frac);
+
+    // Reset my calculation begin flag
+    calc_flag = false;
 }
 
 
