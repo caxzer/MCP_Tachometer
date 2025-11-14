@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h> // type bool for giop.h
+#include <string.h>
 #include "inc/hw_types.h"
 #include "inc/tm4c1294ncpdt.h"
 #include <stdio.h>   // Debug only
@@ -27,15 +28,23 @@
 #define MAX_X 800
 #define MAX_Y 480
 
+/********************************************************************************/
 // Gauge Macros
+/********************************************************************************/
 #define GAUGE_MIN 0
 #define GAUGE_MAX 400
 #define GAUGE_WIDTH 400        // gauge spans 400 pixels (1 per speed unit)
-#define GAUGE_X 10
-#define GAUGE_Y 200
-#define GAUGE_HEIGHT 5
+#define GAUGE_X 10              // pixel position from which the gauge line starts from left edge
+#define GAUGE_Y 465             // pixel position from which the gauge lines start from top
+#define GAUGE_HEIGHT 5          // Height of gauge tick
 
+#define SPEED_CHAR_HEIGHT 20  // Height of number characters beneath the gauge lines
+#define ODO_CHAR_HEIGHT 80  // Height of number characterof the Odometer
+
+
+/********************************************************************************/
 // Global Variables 
+/********************************************************************************/
 // uint32_t sysClock; // Variable for system clock  
 // some predefined basic colors to use with names 
 enum colors{BLACK=0x00000000,WHITE=0x00FFFFFF,GREY=0x00AAAAAA,RED=0x00FF0000,GREEN=0x0000FF00,BLUE=0x000000FF,YELLOW=0x00FFFF00}; 
@@ -47,6 +56,45 @@ uint32_t gauge_width = 800; // length of horizontal "loading" gauge bar
 uint32_t gauge_height = 200; // height of the horizontal "loading" gauge bar
 uint32_t max_speed = 400;
 static uint32_t prev_needle = 0;
+static bool prev_dir = 0;
+
+/********************************************************************************/
+// Pixel map of digits
+/********************************************************************************/
+
+static const uint8_t digit_tacho[10][12] = {
+    // 0
+    {0x3C,0x7E,0xE7,0xC3,0xC3,0xC3,0xC3,0xC3,0xE7,0x7E,0x3C,0x00},
+    // 1
+    {0x18,0x38,0x78,0x18,0x18,0x18,0x18,0x18,0x18,0x7E,0x7E,0x00},
+    // 2
+    {0x3C,0x7E,0xC7,0x06,0x0E,0x1C,0x38,0x70,0xE0,0xFF,0xFF,0x00},
+    // 3
+    {0x7E,0xFF,0x83,0x07,0x1E,0x1E,0x07,0x03,0x83,0xFF,0x7E,0x00},
+    // 4
+    {0x0E,0x1E,0x3E,0x6E,0xCE,0x8E,0xFF,0xFF,0x0E,0x0E,0x0E,0x00},
+    // 5
+    {0xFE,0xFE,0xC0,0xC0,0xFC,0xFE,0x07,0x03,0xC3,0xFE,0x7C,0x00},
+    // 6
+    {0x3E,0x7E,0xE0,0xC0,0xFC,0xFE,0xE7,0xC3,0xE7,0x7E,0x3C,0x00},
+    // 7
+    {0xFF,0xFF,0x03,0x07,0x0E,0x1C,0x38,0x70,0x70,0x70,0x70,0x00},
+    // 8
+    {0x3C,0x7E,0xE7,0xE7,0x7E,0x3C,0x7E,0xE7,0xE7,0x7E,0x3C,0x00},
+    // 9
+    {0x3C,0x7E,0xE7,0xC3,0xE7,0x7F,0x3F,0x07,0x0F,0x7E,0x7C,0x00}
+};
+
+static const uint8_t char_dir[2][12] = {
+    // R
+    {0xFC,0x82,0x82,0x82,0xFC,0x88,0x84,0x82,0x82,0x00,0x00,0x00},
+    // V
+    {0x81,0x81,0x81,0x81,0x42,0x42,0x24,0x24,0x18,0x18,0x00,0x00}
+    
+};
+
+
+
 
 /********************************************************************************
  	 Elementary output functions  => speed optimized as inline
@@ -162,27 +210,10 @@ void configure_display_controller_large (void) // 800 x 480 pixel
 
     write_command(SET_DISPLAY_ON);           // Set display on  manual p. 78
 }
+
+
 /********************************************************************************/
 // Tachometer Gauge here!
-// Progress bar gauge
-/*void draw_horizontal_gauge(uint32_t speed, uint32_t x, uint32_t y, uint32_t width, uint32_t height){
-    uint32_t filled = (speed * width) / 400; // pixels filled along gauge width with respect to speed
-    uint32_t i, j;
-    uint32_t color_filled = RED;
-    uint32_t color_empty = GREY;
-
-     for(j=0; j<height; j++){
-        window_set(x, y+j, x+width-1, y+j);  // set row for one line
-        write_command(0x2C);                 // start memory write
-        for(i=0; i<width; i++){
-            uint32_t color = (i < filled) ? color_filled : color_empty; // Bi-colored
-            write_data((color>>16)&0xff);
-            write_data((color>>8)&0xff);
-            write_data(color&0xff);
-        }
-    }
-}*/
-
 // Fill a rectangle with a single color and defined w&h with respect to starting coordinates 
 void fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color) {
     uint32_t i;
@@ -201,6 +232,7 @@ void fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t
     }
 }
 
+// Custom window size
 void draw_pixel (uint32_t min_x, uint32_t min_y, uint32_t max_x, uint32_t max_y , uint32_t color){
     window_set(min_x, min_y, max_x, max_y);         // set row for one line
     write_command(0x2C);                    // start memory write
@@ -209,8 +241,9 @@ void draw_pixel (uint32_t min_x, uint32_t min_y, uint32_t max_x, uint32_t max_y 
     write_data(color&0xff);         // B
 }
 
+// 1x1 window size
 void draw_pixel_single(uint32_t x, uint32_t y, uint32_t color) {
-    window_set(x, y, x, y);   // set a 1x1 window
+    window_set(x, y, x, y); 
     write_command(0x2C);      // memory write
     write_data((color>>16)&0xFF);
     write_data((color>>8)&0xFF);
@@ -218,73 +251,158 @@ void draw_pixel_single(uint32_t x, uint32_t y, uint32_t color) {
 }
 
 // Needle gauge
-void draw_needle_gauge(uint32_t speed, uint32_t x, uint32_t y, uint32_t width, uint32_t height){
+void draw_needle_gauge(uint32_t speed){
     uint32_t this_needle;
     uint32_t i, j;
 
-    // Find position of te needle
+    // Find position of the needle w.R.t gauge width
+    speed = speed /100; // Watch out: Speed in in factor of 100 here
     if (speed>max_speed) speed = max_speed;
-    this_needle = x + (speed * width) / max_speed;
+    this_needle = (speed * gauge_width) / max_speed;
 
-    // Clear previous needle position only if position changed!
-    if (prev_needle != 0 && prev_needle != this_needle)
-        for(i = 0;i<width;i++){
-            draw_pixel(prev_needle, y+i, prev_needle, y+i, BLACK);
-            /*
-            window_set(prev_needle, y+i, prev_needle, y+i);  // set row for one line
-            write_command(0x2C);                 // start memory write
-            uint32_t color = BLACK;
-            write_data((color>>16)&0xff);   // R
-            write_data((color>>8)&0xff);    // G
-            write_data(color&0xff);         // B
-            */
+    // Clear previous needle position only if position has changed!
+    if (prev_needle != this_needle)
+        for(i = 0;i<gauge_width;i++){
+            draw_pixel(prev_needle, 200+i, prev_needle, 200+i, BLACK);
         }
-
-    // Draw the needle 
-     for(j=0; j<height; j++){
-        draw_pixel(this_needle, y+j, this_needle, y+j, RED);
-        /*
-        window_set(this_needle, y+j, this_needle, y+j);  // set row for one line
-        write_command(0x2C);                 // start memory write
-        uint32_t color = RED;
-        write_data((color>>16)&0xff);   // R
-        write_data((color>>8)&0xff);    // G
-        write_data(color&0xff);         // B
-        */
-        
+    for(j=0; j<gauge_height; j++){    // THEN draw the needle
+        draw_pixel(this_needle, 200+j, this_needle, 200+j, RED);
     }
-
+    
     // Save current needle position
     prev_needle = this_needle;
 }
-uint32_t map(uint32_t val, uint32_t in_min, uint32_t in_max, uint32_t out_min, uint32_t out_max){
-    return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
 
-void draw_scale(void){
-    uint32_t step = 10;
-    uint32_t val = 0;
-    int j = 0;
-
-    for (val = gauge_x ; val < gauge_width ; val+=step){
-        uint32_t x = map(val, 0, max_speed, gauge_x, gauge_x + gauge_width);
-        
-        for (j = 0; j < GAUGE_HEIGHT; j++) {
-            draw_pixel_single(x, GAUGE_Y + GAUGE_HEIGHT + j, WHITE);
+void draw_digit_tacho(int digit, int x, int y, uint32_t color) {
+    if (digit < 0 || digit > 9) return;
+    int row=0;
+    int col=0;
+    for ( row = 0; row < 12; row++) {
+        uint8_t bits = digit_tacho[digit][row];
+        for ( col = 0; col < 8; col++) {
+            if (bits & (1 << (7 - col))) {
+                draw_pixel_single(x + col, y + row, color);
+            }
         }
-
     }
 }
 
+void draw_number_tacho(int number, int x, int y, uint32_t color){
+    char buf[4];
+    snprintf(buf, sizeof(buf), "%d", number); // int to string
+
+    int i = 0;
+    while (buf[i] != '\0') {
+        int digit = buf[i] - '0';
+        draw_digit_tacho(digit, x + (i * 9), y, color); // 9 = 8 pixels + 1 spacing
+        i++;
+    }
+}
+
+// Draw the ticks and speed number on the tachometer gauge
 void draw_gauge_ticks(void) {
-    int step = 50; // draw tick marks every 50 units
-    int tick_height = 5;
+    const int step = 20; // each step equals to 10 km/h
     int value = 0;
     int j = 0;
-    for (value = GAUGE_MIN; value <= GAUGE_MAX; value += step) {
-        int x = GAUGE_X + value; // one pixel per speed unit
-        for (j = 0; j < tick_height; j++) {
-            draw_pixel_single(x, GAUGE_Y + GAUGE_HEIGHT + j, WHITE);
+    int x = 0;
+
+    // draw along the whle width of the display
+    for (value = 0; value < MAX_X; value += step) {
+        x = value; // start from edge 
+        
+        if (value%50 == 0 || value == 0  ){ // draw large tick
+            for (j = 0; j < GAUGE_HEIGHT*3; j++) {
+                draw_pixel_single(x, MAX_Y - GAUGE_HEIGHT*3 - SPEED_CHAR_HEIGHT*2 + j, WHITE);
+            }
+            // show number under large ticks
+            // display the speed numbers below the ticks
+            //if(value == 0)
+                draw_number_tacho(value/2,x,(int)MAX_Y - GAUGE_HEIGHT*3-SPEED_CHAR_HEIGHT,WHITE);
+            //else
+                //draw_number_tacho(value/2,x - 5 ,(int)MAX_Y - GAUGE_HEIGHT*3-SPEED_CHAR_HEIGHT,WHITE);
+        }
+        else {  // small ticks
+            for (j = 0; j < GAUGE_HEIGHT; j++) {
+                draw_pixel_single(x, MAX_Y - GAUGE_HEIGHT - SPEED_CHAR_HEIGHT*2 + j, WHITE);
+            }
         }
     }
+
+    // draw last tick for 400kmh
+    for (j = 0; j < GAUGE_HEIGHT*3; j++)
+        draw_pixel_single(MAX_X-1, MAX_Y - GAUGE_HEIGHT*3 - SPEED_CHAR_HEIGHT*2 + j, WHITE);
+    draw_number_tacho(value/2,x-10,(int)MAX_Y - GAUGE_HEIGHT*3-SPEED_CHAR_HEIGHT,WHITE); // 30 == length of numbers
+
+}
+
+
+
+void draw_odometer(float distance){
+    int distance_int = (int)distance;
+    int distance_frac = (int)((distance-distance_int) *100); // 2 d.p.
+
+    char int_buf[8];
+    char frac_buf[4];
+
+    // Format data to buffer
+    snprintf(int_buf, sizeof(int_buf), "%d", distance_int);
+    snprintf(frac_buf, sizeof(frac_buf), "%02d", distance_frac);
+
+    int total_width = (strlen(int_buf) + strlen(frac_buf) + 1) * 9; // +1 for comma
+    int height = 16;  // approximate height of your digit bitmaps
+    fill_rect(0, 0, (uint32_t)total_width, (uint32_t)height, BLACK); // clear area
+
+    // integer part
+    int cursor = 0;
+    int i = 0;
+    int j = 0;
+    for (i = 0; int_buf[i] != '\0'; i++) {
+        int digit = int_buf[i] - '0';
+        draw_digit_tacho(digit, cursor, 0, WHITE);
+        cursor += 9; // spacing
+    }
+
+    // draw comma
+    for (j = 0; j < 2; j++) {
+        draw_pixel_single(cursor + 2, 10 + j, WHITE); // two-pixel comma
+    }
+    cursor += 8;
+
+    // fractional part
+    for (i = 0; frac_buf[i] != '\0'; i++) {
+        int digit = frac_buf[i] - '0';
+        draw_digit_tacho(digit, cursor, 0, WHITE);
+        cursor += 9;
+    }
+}
+
+void draw_char_dir(int dir_f, int x, int y, uint32_t color) {
+    int row=0;
+    int col=0;
+    for ( row = 0; row < 12; row++) {
+        uint8_t bits = char_dir[dir_f][row];
+        for ( col = 0; col < 8; col++) {
+            if (bits & (1 << (7 - col))) {
+                draw_pixel_single(x + col, y + row, color);
+            }
+        }
+    }
+}
+
+void draw_direction(bool directionForwards){
+    // clear if directions different
+    if(directionForwards != prev_dir){
+        fill_rect(770, 0, 20, 20, BLACK);
+        
+        if(directionForwards)   // forwards
+            draw_char_dir(directionForwards, 770, 0, WHITE);
+        else    // backwards
+            draw_char_dir(directionForwards, 770, 0, WHITE);
+    }
+    prev_dir = directionForwards;
+}
+
+// Combination of all the functions here
+void update_display(void){
+
 }

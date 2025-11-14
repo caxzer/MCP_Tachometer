@@ -16,7 +16,6 @@ extern uint32_t gauge_y;
 extern uint32_t gauge_width;
 extern uint32_t gauge_height;
 extern uint32_t max_speed;
-extern volatile uint32_t speed;
 
 // Display functions
 void init_ports_display(void);
@@ -24,7 +23,14 @@ void configure_display_controller_large(void);
 void fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color);
 void draw_pixel(uint32_t min_x, uint32_t min_y, uint32_t max_x, uint32_t max_y, uint32_t color);
 void draw_pixel_single(uint32_t x, uint32_t y, uint32_t color);
-void draw_needle_gauge(uint32_t speed, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+void draw_needle_gauge(uint32_t speed);
 void draw_gauge_ticks(void);
+
+void draw_small_digit(int digit, int x, int y, uint32_t color);
+void draw_large_digit(int digit, int x, int y, uint32_t color);
+
+void draw_odometer(float distance);
+void draw_direction(bool directionForwards);
+void update_display(void);
 
 #endif

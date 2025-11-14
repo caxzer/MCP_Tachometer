@@ -112,7 +112,9 @@ int main(void)
     while(1)
     {   
         calc_speed_dir();
-        draw_needle_gauge(speed, gauge_x, gauge_y, gauge_width, gauge_height);
-        SysCtlDelay(sysclk / 10); // small delay
+        draw_needle_gauge(speed);
+        draw_gauge_ticks();
+        draw_odometer(distance_total);
+        draw_direction(directionForwards);
     }
 }

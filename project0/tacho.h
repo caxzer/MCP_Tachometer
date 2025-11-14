@@ -11,5 +11,8 @@ void calc_speed_dir(void);
 
 extern volatile float rpm;
 extern volatile bool directionForwards;
+extern volatile uint32_t speed;
+extern volatile float distance_total;
+
 
 #endif
