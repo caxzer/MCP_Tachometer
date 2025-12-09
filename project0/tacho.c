@@ -28,6 +28,7 @@ volatile uint32_t count = 0;
 volatile uint32_t speed = 0;
 volatile bool calc_flag = false;
 volatile float distance_total = 0.0f;
+bool max_dist_reached = false;
 
 // Inputs from motors at Port P
 void init_motor_ports_interrupts(void){
@@ -116,8 +117,6 @@ void timer_interrupt_handler(void){
 }
 
 void calc_speed_dir(){
-    while(!calc_flag){} // do this every 100ms
-
     rpm = (count / 0.1f ) * (60.0f / 2.0f); // number of revolutions per minute, 
     float speed_f = rpm * CIRCUMFERENCE * 0.06f;    // taking average within 100ms
 
@@ -128,7 +127,14 @@ void calc_speed_dir(){
     // Calculate distance travelled
     float delta_distance = 0;
     delta_distance = (speed_f / 3600.0f) * 0.1f;  //km
-    distance_total += delta_distance;
+    
+    if (!max_dist_reached) {  // only able to set this back to 0 with reset
+        if (distance_total >= 999.99) {
+            max_dist_reached = true;
+            distance_total = 999.99;
+        } else distance_total += delta_distance; 
+    }
+
     int distance_int = (int)distance_total;                // whole km
     int distance_frac = (int)((distance_total - distance_int) * 100); // two decimals
 

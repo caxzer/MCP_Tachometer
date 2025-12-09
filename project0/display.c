@@ -55,7 +55,7 @@
 #define XTSPD 382
 #define YTSPD 145
 
-#define MAX_SPEED 400
+#define MAX_SPEED 400.0f
 #define CENTER_POINT_X 400
 #define CENTER_POINT_Y 280
 #define OUTER_ARC_RAD 270
@@ -66,6 +66,7 @@
 #define LONG_TICK 15
 #define SPEED_STEP 10
 
+#define S_FACTOR 0.1f  // slow smoothing factor, 1.0 is instant
 
 /********************************************************************************/
 // Global Variables 
@@ -78,7 +79,8 @@ int colorarray[]={0x00000000,0x00FFFFFF,0x00AAAAAA,0x00FF0000,0x0000FF00,0x00000
 static bool prev_dir = 0;
 int prev_x1 = 0;
 int prev_y1 = 0;
-
+static double c_speed = 0; // current speed, displayed on tacho
+static double e_speed = 0;
 /********************************************************************************/
 // Pixel map of digits
 /********************************************************************************/
@@ -374,7 +376,7 @@ void draw_odometer(float distance){
     char frac_buf[3];
 
     // Format data to buffer
-    if (distance_int > 999) distance_int = 999; // maximal distance set to 999 (3 integers)
+    //if (distance_int > 999) distance_int = 999; // maximal distance set to 999 (3 integers)
     
     snprintf(int_buf, sizeof(int_buf), "%03d", distance_int);
     snprintf(frac_buf, sizeof(frac_buf), "%02d", distance_frac);
@@ -494,16 +496,24 @@ void rasterArc(int x0, int y0, int radius)
     }
 }
 
-void bresenham_needle(int x0, int y0, uint32_t speed){
-    speed = speed /100; // Watch out: Speed is in factor of 100 here
-    double s = (double)speed;
+void bresenham_needle(int x0, int y0, uint32_t t_speed){
+    if (t_speed == 0) e_speed = 0;
+    else e_speed = t_speed - c_speed; // target - "current"
+    
+    if (fabs(e_speed) < 1.0) {
+        c_speed = t_speed;
+    } else {
+        c_speed += (e_speed * S_FACTOR); 
+    }
+    
+    double this_speed = c_speed /100; // Watch out: Speed is in factor of 100 here
 
-    if (s>(double)MAX_SPEED) s = (double)MAX_SPEED; 
+    if (this_speed > MAX_SPEED) this_speed = MAX_SPEED; 
     int r = NEEDLE_LENGTH;    // length of needle (almost) touching the arc
     
     // Find angle to the length of the arc ()
     double angle = 0.0f;
-    angle = (5.0/4.0)*M_PI - ((s/(double)MAX_SPEED) * (3.0/2.0)*M_PI); // adjust to 270 deg or 3/2*M_PI
+    angle = (5.0/4.0)*M_PI - ((this_speed/MAX_SPEED) * (3.0/2.0)*M_PI); // adjust to 270 deg or 3/2*M_PI
     int x1 = x0 + (int) r * cos(angle);
     int y1 = y0 - (int) r * sin(angle);
     

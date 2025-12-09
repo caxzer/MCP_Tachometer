@@ -17,6 +17,7 @@
 
 // Macros
 #define WINDOW_MS 100
+#define DISPLAY_WINDOW_MS 50
 #define MOTOR_S1 GPIO_PIN_0
 #define MOTOR_S2 GPIO_PIN_1
 #define MOTOR_PORT GPIO_PORTP_BASE
@@ -31,6 +32,8 @@ __error__(char *pcFilename, uint32_t ui32Line)
 // Global variables
 uint32_t sysclk;
 uint32_t window_timer_period;
+uint32_t display_timer_period;
+volatile bool update_display = false;
 
 // Function prototype declarations
 void init_clock(void);
@@ -51,7 +54,12 @@ void init_timer(void){
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
     // Wait for Timer 0 to be ready
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0)){};
+    // Enable Timer 1
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
+    // Wait for Timer 1 to be ready
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER1)){};
     window_timer_period = sysclk / (1000 / WINDOW_MS);
+    display_timer_period = sysclk / (1000 / DISPLAY_WINDOW_MS);
 }
 
 void init_uart(void){
@@ -68,6 +76,34 @@ void init_uart(void){
     UARTStdioConfig(0, 115200, sysclk);
 }
 
+void display_interrupt_handler(void){
+    // Clear interrupt flag 
+    TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+    update_display = true;
+}
+
+void display_timer_interrupt(void){
+
+    TimerDisable(TIMER1_BASE, TIMER_A);
+
+    TimerConfigure(TIMER1_BASE, TIMER_CFG_PERIODIC); // 32-bit res
+    TimerLoadSet(TIMER1_BASE, TIMER_A, display_timer_period - 1);
+
+    // Register interrupt
+    TimerIntRegister(TIMER1_BASE, TIMER_A, display_interrupt_handler);
+    TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // Interrupt enable
+    TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // NVIC on timer 1A
+    IntPrioritySet(INT_TIMER1A, 0x20); // Prio 2 (Most sig. 3 bits)
+    IntEnable(INT_TIMER1A);
+    TimerEnable(TIMER1_BASE, TIMER_A);
+}
+
+
+
 int main(void)
 {
     // Setup phase
@@ -76,7 +112,8 @@ int main(void)
     init_motor_ports_interrupts();  // Setup ports for motors and enable their interrupts
     init_timer();                   // Setup timer
     IntMasterEnable();              // Crucial: EN NVIC for whole board
-    init_timer_interrupt();         // Enable interrupts for timer
+    init_timer_interrupt();         // Enable interrupts for timer0 - window
+    display_timer_interrupt();      // Enable interrupts for timer1 - display
     init_ports_display();           // Init Port L for Display Control and Port M for Display Data
 	configure_display_controller_large();  // initalize and configuration
 
@@ -91,17 +128,23 @@ int main(void)
     // Loop Forever
     while(1)
     {   
-        calc_speed_dir(); //delivers us a value every 100ms
-
-        //draw_needle_gauge(speed);
-        /*Odometer*/
-        draw_odometer(distance_total);
+        if(calc_flag){ // move calc flag to here, so we get a speed update every 100ms
+            calc_speed_dir(); //delivers us a value every 100ms
+            
+            /*Odometer*/
+            draw_odometer(distance_total);
+            
+            /*Direction indicator */
+            draw_direction(directionForwards);
+        }
         
-        /*Direction indicator */
-        draw_direction(directionForwards);
-
-        /*Draw needle with bresenham algo*/
-        draw_bresenham(speed);
-        draw_bresenham_ticks();
+        //draw_needle_gauge(speed);
+        if(update_display){ // update every 20ms-ish
+            /*Draw needle with bresenham algo*/
+            draw_bresenham(speed);
+            draw_bresenham_ticks(); // draw the numbers!
+            update_display = false;
+        }
+        
     }
 }

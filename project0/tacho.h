@@ -15,6 +15,7 @@ extern volatile bool directionForwards;
 extern volatile uint32_t speed;
 extern volatile float distance_total;
 extern uint32_t window_timer_period;
+extern volatile bool calc_flag;
 
 
 #endif
