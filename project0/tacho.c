@@ -18,9 +18,9 @@
 #define WINDOW_PERIOD 100   // millisecond
 #define CIRCUMFERENCE 0.444f // Circumference of motor wheel on the board, adjust according to max speed!
 
+
 // Global variables
 volatile uint32_t edgeCountWindowS1 = 0; // Number of pulses in this time frame
-//volatile uint32_t edgeCountWindowS2 = 0;
 volatile float rpm = 0.0f;
 volatile bool directionForwards = true;
 volatile bool prevS1 = false, prevS2 = false, thisS1 = false, thisS2 = false; // Signal flag for direction calculation
@@ -57,19 +57,16 @@ void init_motor_ports_interrupts(void){
 
 void motor_interrupt_handler(){
     // Read the Raw Interrupt Status directly
-    uint32_t stat = GPIOIntStatus(MOTOR_PORT,true);     // Get current interrupt status, masked interrupt to prevent triggering during handler
-    
-    // save immediate port status into local var
+    // Get current interrupt status, masked interrupt to prevent triggering during handler
+    uint32_t stat = GPIOIntStatus(MOTOR_PORT,true);     
 
-    if (stat & MOTOR_S1){
+    if (stat & MOTOR_S1){   // Interrupt by s1
         if(GPIOPinRead(MOTOR_PORT, MOTOR_S1)){  // Rising edge
             edgeCountWindowS1++;
             thisS1 = true;
         } else thisS1 = false;  // Falling edge
-    }
-    if (stat & MOTOR_S2){
-        if(GPIOPinRead(MOTOR_PORT, MOTOR_S2)){  // Rising edge
-            //edgeCountWindowS2++;   
+    } else {
+        if(GPIOPinRead(MOTOR_PORT, MOTOR_S2)){  // Rising edge 
             thisS2 = true;
         } else thisS2 = false;  // Falling edge
     }

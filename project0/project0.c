@@ -91,7 +91,8 @@ int main(void)
     // Loop Forever
     while(1)
     {   
-        calc_speed_dir();
+        calc_speed_dir(); //delivers us a value every 100ms
+
         //draw_needle_gauge(speed);
         /*Odometer*/
         draw_odometer(distance_total);
