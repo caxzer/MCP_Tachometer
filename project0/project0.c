@@ -16,9 +16,7 @@
 #include "display.h"
 
 // Macros
-#define WINDOW_MS        100
-#define WINDOW_TIMER_PERIOD 1000
-
+#define WINDOW_MS 100
 #define MOTOR_S1 GPIO_PIN_0
 #define MOTOR_S2 GPIO_PIN_1
 #define MOTOR_PORT GPIO_PORTP_BASE
@@ -33,7 +31,6 @@ __error__(char *pcFilename, uint32_t ui32Line)
 // Global variables
 uint32_t sysclk;
 uint32_t window_timer_period;
-
 
 // Function prototype declarations
 void init_clock(void);
@@ -55,24 +52,6 @@ void init_timer(void){
     // Wait for Timer 0 to be ready
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0)){};
     window_timer_period = sysclk / (1000 / WINDOW_MS);
-}
-
-// Down counter timer with interrupt
-void init_timer_interrupt(void){
-    TimerDisable(TIMER0_BASE, TIMER_A);
-
-    TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);
-    TimerLoadSet(TIMER0_BASE, TIMER_A, window_timer_period - 1);
-
-    // Register interrupt
-    TimerIntRegister(TIMER0_BASE, TIMER_A, timer_interrupt_handler);
-    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-    
-    // Interrupt enable
-    TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-    IntEnable(INT_TIMER0A);
-
-    TimerEnable(TIMER0_BASE, TIMER_A);
 }
 
 void init_uart(void){
@@ -105,16 +84,23 @@ int main(void)
     UARTprintf("KMZ60 RPM Measurement started. \n");
     
     // Clear screen with black background
-    fill_rect(0, 0, MAX_X, MAX_Y, BLACK);
-    draw_gauge_ticks();
+    reset_background();
+    draw_bresenham_ticks();
+    draw_arc();  // bresenham half arc
 
     // Loop Forever
     while(1)
     {   
         calc_speed_dir();
-        draw_needle_gauge(speed);
-        draw_gauge_ticks();
+        //draw_needle_gauge(speed);
+        /*Odometer*/
         draw_odometer(distance_total);
+        
+        /*Direction indicator */
         draw_direction(directionForwards);
+
+        /*Draw needle with bresenham algo*/
+        draw_bresenham(speed);
+        draw_bresenham_ticks();
     }
 }

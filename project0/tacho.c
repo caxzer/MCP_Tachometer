@@ -9,6 +9,7 @@
 #include "driverlib/timer.h"
 #include "inc/hw_ints.h"
 
+#include "tacho.h"
 
 // Macros 
 #define MOTOR_S1 GPIO_PIN_0
@@ -19,26 +20,14 @@
 
 // Global variables
 volatile uint32_t edgeCountWindowS1 = 0; // Number of pulses in this time frame
-volatile uint32_t edgeCountWindowS2 = 0;
+//volatile uint32_t edgeCountWindowS2 = 0;
 volatile float rpm = 0.0f;
 volatile bool directionForwards = true;
 volatile bool prevS1 = false, prevS2 = false, thisS1 = false, thisS2 = false; // Signal flag for direction calculation
 volatile uint32_t count = 0;
 volatile uint32_t speed = 0;
 volatile bool calc_flag = false;
-float distance_total = 0.0f;
-
-
-// convert timer ticks to seconds
-/*static inline float ticks_to_second(uint32_t ticks){
-    return ticks/SysCtlClockGet();
-}*/
-
-// Function prototype declarations
-void init_motor_ports_interrupts(void);
-void motor_interrupt_handler(void);
-void timer_interrupt_handler(void);
-void calc_speed_dir(void);
+volatile float distance_total = 0.0f;
 
 // Inputs from motors at Port P
 void init_motor_ports_interrupts(void){
@@ -60,13 +49,18 @@ void init_motor_ports_interrupts(void){
     // Enable interrupt
     GPIOIntEnable(MOTOR_PORT, MOTOR_S1|MOTOR_S2);
 
+    // NVIC on Port P0 aka. signal S1
     IntEnable(INT_GPIOP0);
+    IntPrioritySet(INT_GPIOP0, 0x60); // Prio 3
+
 }
 
 void motor_interrupt_handler(){
-    // Get interrupt status for PORT P 
-    uint32_t stat = GPIOIntStatus(MOTOR_PORT,true);     // Get current interrupt status
+    // Read the Raw Interrupt Status directly
+    uint32_t stat = GPIOIntStatus(MOTOR_PORT,true);     // Get current interrupt status, masked interrupt to prevent triggering during handler
     
+    // save immediate port status into local var
+
     if (stat & MOTOR_S1){
         if(GPIOPinRead(MOTOR_PORT, MOTOR_S1)){  // Rising edge
             edgeCountWindowS1++;
@@ -75,7 +69,7 @@ void motor_interrupt_handler(){
     }
     if (stat & MOTOR_S2){
         if(GPIOPinRead(MOTOR_PORT, MOTOR_S2)){  // Rising edge
-            edgeCountWindowS2++;   
+            //edgeCountWindowS2++;   
             thisS2 = true;
         } else thisS2 = false;  // Falling edge
     }
@@ -93,27 +87,46 @@ void motor_interrupt_handler(){
     prevS2 = thisS2;
 }
 
+// Periodic timer with interrupt
+void init_timer_interrupt(void){
+    TimerDisable(TIMER0_BASE, TIMER_A);
+
+    TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);
+    TimerLoadSet(TIMER0_BASE, TIMER_A, window_timer_period - 1);
+
+    // Register interrupt
+    TimerIntRegister(TIMER0_BASE, TIMER_A, timer_interrupt_handler);
+    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // Interrupt enable
+    TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // NVIC on timer 0A
+    IntEnable(INT_TIMER0A);
+    IntPrioritySet(INT_TIMER0A, 0x40); // Prio 2 (Most sig. 3 bits)
+
+    TimerEnable(TIMER0_BASE, TIMER_A);
+}
+
 // Once the window period of 100 ms has been reached, timer interrupt !
 void timer_interrupt_handler(void){
     // Clear interrupt flag 
     TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
     count = edgeCountWindowS1;
 
-    // One redundant signal?
     edgeCountWindowS1 = 0;
-    edgeCountWindowS2 = 0;
     calc_flag = true;
 }
 
 void calc_speed_dir(){
     while(!calc_flag){} // do this every 100ms
 
-    rpm = (count / 0.1f ) * (60.0f / 2.0f); // number of revolutions per minute
-    float speed_f = rpm * CIRCUMFERENCE * 0.06f;
+    rpm = (count / 0.1f ) * (60.0f / 2.0f); // number of revolutions per minute, 
+    float speed_f = rpm * CIRCUMFERENCE * 0.06f;    // taking average within 100ms
 
-    //UARTprintf("RPM: %.2f, Speed: %.2f, Direction: %s\n", rpm, speed, directionForwards ? "V":"R"); 
+    //UARTprintf("RPM: %.2f, Speed: %.2f, Direction: %s\n", rpm, speed, directionForwards ? "V":"R"); // debug
     int rpm_i = (int)rpm;
-    speed = (int)(speed_f * 100); // two decimals, in kmh
+    speed = (int)(speed_f * 100); // for two decimals in kmh !!100 MULTIPLE HERE!!
 
     // Calculate distance travelled
     float delta_distance = 0;
@@ -122,6 +135,7 @@ void calc_speed_dir(){
     int distance_int = (int)distance_total;                // whole km
     int distance_frac = (int)((distance_total - distance_int) * 100); // two decimals
 
+    // debug
     UARTprintf( "RPM: %d, Speed: %d.%02d km/h, Direction: %s, Distance: %03d,%02d km\n",
         rpm_i,
         speed / 100,
