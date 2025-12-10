@@ -38,35 +38,35 @@
 #define CHAR_HEIGHT 12  
 #define CHAR_WIDTH 8
 
-#define GAUGE_WIDTH 800         // Gauge spans 800 pixels (2 per speed unit)
-#define GAUGE_HEIGHT 240        // From which position the height of the gauge starts
-#define NEEDLE_HEIGHT 200       // Height of needle
-#define TICK_HEIGHT 5           // Height of gauge tick
+// Horizontal needle gauge
+// #define GAUGE_WIDTH 800         // Gauge spans 800 pixels (2 per speed unit)
+// #define GAUGE_HEIGHT 240        // From which position the height of the gauge starts
+// #define NEEDLE_HEIGHT 200       // Height of needle
+// #define TICK_HEIGHT 5           // Length of gauge tick
 
 #define SPEED_CHAR_HEIGHT 20    // Height of number characters beneath the gauge lines
 #define ODO_CHAR_HEIGHT 80      // Height of number characters of the Odometer and Direction
 
-#define XDIR 394
-#define YDIR 310
+#define XDIR 394    // Starting X-coord for direction
+#define YDIR 310    // Starting Y-coord for direction
 
-#define XODO 364
-#define YODO 330
+#define XODO 364    // Starting X-coord for Odometer
+#define YODO 330    // Starting Y-coord for Odometer
 
-#define XTSPD 382
-#define YTSPD 145
+#define XTSPD 382   // Starting X-coord for KM/H
+#define YTSPD 145   // Starting Y-coord for KM/H
 
 #define MAX_SPEED 400.0f
 #define CENTER_POINT_X 400
 #define CENTER_POINT_Y 280
-#define OUTER_ARC_RAD 270
-#define INNER_ARC_RAD 255
-#define NEEDLE_LENGTH 245
-#define NUM_TICKS 40            // Tick every 10 km/h
-#define SHORT_TICK 5
-#define LONG_TICK 15
-#define SPEED_STEP 10
-
-#define S_FACTOR 0.1f  // slow smoothing factor, 1.0 is instant
+#define OUTER_ARC_RAD 270   // Radius for ticks arc
+#define INNER_ARC_RAD 255   // Radius for border arc
+#define NEEDLE_LENGTH 245   
+#define NUM_TICKS 40        // Tick every 10 km/h
+#define SHORT_TICK 5        // Length of short tick
+#define LONG_TICK 15        // Length of long tick
+#define SPEED_STEP 10       // Speedometer pos. where ticks are marked
+#define S_FACTOR 0.1f       // Slow smoothing factor for needle movement, 1.0 is instant
 
 /********************************************************************************/
 // Global Variables 
@@ -307,7 +307,7 @@ void draw_digit_tacho(int digit, int x, int y, uint32_t color) {
     if (digit < 0 || digit > 9) return;
     int row=0;
     int col=0;
-    // draw line by line
+    // draw row by row of digit bitmap
     for ( row = 0; row < CHAR_HEIGHT; row++) {
         uint8_t bits = digit_tacho[digit][row];
         for ( col = 0; col < CHAR_WIDTH; col++) {
@@ -375,9 +375,6 @@ void draw_odometer(float distance){
     char int_buf[4];
     char frac_buf[3];
 
-    // Format data to buffer
-    //if (distance_int > 999) distance_int = 999; // maximal distance set to 999 (3 integers)
-    
     snprintf(int_buf, sizeof(int_buf), "%03d", distance_int);
     snprintf(frac_buf, sizeof(frac_buf), "%02d", distance_frac);
 
@@ -497,8 +494,8 @@ void rasterArc(int x0, int y0, int radius)
 }
 
 void bresenham_needle(int x0, int y0, uint32_t t_speed){
-    if (t_speed == 0) e_speed = 0;
-    else e_speed = t_speed - c_speed; // target - "current"
+    if (t_speed == 0) e_speed = 0;      // e_speed - error speed ; show difference target - currently shown speed
+    else e_speed = t_speed - c_speed;   // t_speed - target speed
     
     if (fabs(e_speed) < 1.0) {
         c_speed = t_speed;

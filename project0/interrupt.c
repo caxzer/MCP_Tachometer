@@ -9,15 +9,15 @@
 #include "driverlib/timer.h"
 #include "inc/hw_ints.h"
 
-#include "tacho.h"
+#include "interrupt.h"
 
 // Macros 
 #define MOTOR_S1 GPIO_PIN_0
 #define MOTOR_S2 GPIO_PIN_1
 #define MOTOR_PORT GPIO_PORTP_BASE
 #define WINDOW_PERIOD 100   // millisecond
-#define CIRCUMFERENCE 0.444f // Circumference of motor wheel on the board, adjust according to max speed!
-
+//#define CIRCUMFERENCE 0.444f // Circumference of motor wheel on the board, adjust according to max speed!
+#define CIRCUMFERENCE 0.5f
 
 // Global variables
 volatile uint32_t edgeCountWindowS1 = 0; // Number of pulses in this time frame
@@ -52,7 +52,7 @@ void init_motor_ports_interrupts(void){
 
     // NVIC on Port P0 aka. signal S1
     IntEnable(INT_GPIOP0);
-    IntPrioritySet(INT_GPIOP0, 0x60); // Prio 3
+    IntPrioritySet(INT_GPIOP0, 0x0); // Prio 1 (Most sig. 3 bits)
 
 }
 
@@ -101,7 +101,7 @@ void init_timer_interrupt(void){
     
     // NVIC on timer 0A
     IntEnable(INT_TIMER0A);
-    IntPrioritySet(INT_TIMER0A, 0x40); // Prio 2 (Most sig. 3 bits)
+    IntPrioritySet(INT_TIMER0A, 0x20); // Prio 2 (Most sig. 3 bits)
 
     TimerEnable(TIMER0_BASE, TIMER_A);
 }
@@ -151,5 +151,28 @@ void calc_speed_dir(){
     calc_flag = false;
 }
 
+void display_timer_interrupt(void){
 
+    TimerDisable(TIMER1_BASE, TIMER_A);
 
+    TimerConfigure(TIMER1_BASE, TIMER_CFG_PERIODIC); // 32-bit res
+    TimerLoadSet(TIMER1_BASE, TIMER_A, display_timer_period - 1);
+
+    // Register interrupt
+    TimerIntRegister(TIMER1_BASE, TIMER_A, display_interrupt_handler);
+    TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // Interrupt enable
+    TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // NVIC on timer 1A
+    IntPrioritySet(INT_TIMER1A, 0x40); // Prio 3 (Most sig. 3 bits)
+    IntEnable(INT_TIMER1A);
+    TimerEnable(TIMER1_BASE, TIMER_A);
+}
+
+void display_interrupt_handler(void){
+    // Clear interrupt flag 
+    TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+    update_display = true;
+}
