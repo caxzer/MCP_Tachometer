@@ -30,6 +30,12 @@ volatile bool calc_flag = false;
 volatile float distance_total = 0.0f;
 bool max_dist_reached = false;
 
+// CMSIS Functions?
+// SystickPeriodSet
+// SysTickIntRegister
+// SysTickIntEnable
+// IntMasterEnable
+
 // Inputs from motors at Port P
 void init_motor_ports_interrupts(void){
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOP);
@@ -99,7 +105,7 @@ void init_timer_interrupt(void){
     // Interrupt enable
     TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
     
-    // NVIC on timer 0A
+    // NVIC on timer 0A [NVIC savs the address of the handler]
     IntEnable(INT_TIMER0A);
     IntPrioritySet(INT_TIMER0A, 0x20); // Prio 2 (Most sig. 3 bits)
 

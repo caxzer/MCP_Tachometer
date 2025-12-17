@@ -80,11 +80,12 @@ int main(void)
     init_uart();                    // Setup UART connection to PC for Debugging
     init_timer();                   // Setup timer
 
-    IntMasterEnable();              // Crucial: EN NVIC for whole board
+    IntMasterDisable();              // Crucial: EN NVIC for whole board
     init_motor_ports_interrupts();  // Setup ports for motors and enable their interrupts
     init_timer_interrupt();         // Enable interrupts for timer0 - window
     display_timer_interrupt();      // Enable interrupts for timer1 - display
-    
+    IntMasterEnable();              // Crucial: EN NVIC for whole board
+
     init_ports_display();           // Init Port L for Display Control and Port M for Display Data
 	configure_display_controller_large();  // display init and configuration
 

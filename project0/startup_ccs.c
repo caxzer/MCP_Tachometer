@@ -60,6 +60,7 @@ extern uint32_t __STACK_TOP;
 //extern void Timer0IntHandler(void);
 extern void motor_interrupt_handler(void);
 extern void timer_interrupt_handler(void);
+extern void display_interrupt_handler(void);
 
 //*****************************************************************************
 //
@@ -109,7 +110,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // Watchdog timer
     timer_interrupt_handler,                      // Timer 0 subtimer A
     IntDefaultHandler,                      // Timer 0 subtimer B
-    IntDefaultHandler,                      // Timer 1 subtimer A
+    display_interrupt_handler,                      // Timer 1 subtimer A
     IntDefaultHandler,                      // Timer 1 subtimer B
     IntDefaultHandler,                      // Timer 2 subtimer A
     IntDefaultHandler,                      // Timer 2 subtimer B
