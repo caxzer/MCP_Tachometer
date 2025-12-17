@@ -66,7 +66,7 @@
 #define SHORT_TICK 5        // Length of short tick
 #define LONG_TICK 15        // Length of long tick
 #define SPEED_STEP 10       // Speedometer pos. where ticks are marked
-#define S_FACTOR 0.1f       // Slow smoothing factor for needle movement, 1.0 is instant
+#define S_FACTOR 0.3f       // Slow smoothing factor for needle movement, 1.0 is instant
 
 /********************************************************************************/
 // Global Variables 
@@ -494,11 +494,11 @@ void rasterArc(int x0, int y0, int radius)
 }
 
 void bresenham_needle(int x0, int y0, uint32_t t_speed){
-    if (t_speed == 0) e_speed = 0;      // e_speed - error speed ; show difference target - currently shown speed
-    else e_speed = t_speed - c_speed;   // t_speed - target speed
+    if (t_speed == 0) e_speed = - c_speed;      // e_speed = error speed : show difference of target and current shown speed
+    else e_speed = t_speed - c_speed;   // t_speed = target speed
     
-    if (fabs(e_speed) < 1.0) {
-        c_speed = t_speed;
+    if (fabs(e_speed) < 1.0) { // small difference, speed jumps
+        c_speed = t_speed; 
     } else {
         c_speed += (e_speed * S_FACTOR); 
     }
@@ -609,8 +609,6 @@ void bresenham_ticks(int x0, int y0){    // at r = 260, short = 5, long = 15
         cursor += 9;
     }
 }
-
-
 
 /*For call from main*/
 void draw_arc(void){
