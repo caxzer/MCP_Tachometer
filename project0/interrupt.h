@@ -21,7 +21,9 @@ extern volatile uint32_t speed;
 extern volatile float distance_total;
 extern uint32_t window_timer_period;
 extern uint32_t display_timer_period;
+extern uint32_t warning_timer_period;
 extern volatile bool calc_flag;
 extern volatile bool update_display;
+extern volatile bool warning_flag; // no handler, only deliver flag to display module
 
 #endif

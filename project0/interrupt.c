@@ -17,7 +17,7 @@
 #define MOTOR_PORT GPIO_PORTP_BASE
 #define WINDOW_PERIOD 100   // millisecond
 //#define CIRCUMFERENCE 0.444f // Circumference of motor wheel on the board, adjust according to max speed!
-#define CIRCUMFERENCE 0.5f
+#define CIRCUMFERENCE 0.6f
 
 // Global variables
 volatile uint32_t edgeCountWindowS1 = 0; // Number of pulses in this time frame
@@ -29,6 +29,8 @@ volatile uint32_t speed = 0;
 volatile bool calc_flag = false;
 volatile float distance_total = 0.0f;
 bool max_dist_reached = false;
+volatile bool warning_flag = false;
+static bool warning_active = false;
 
 // CMSIS Functions?
 // SystickPeriodSet
@@ -122,13 +124,99 @@ void timer_interrupt_handler(void){
     calc_flag = true;
 }
 
-void calc_speed_dir(){
+void display_timer_interrupt(void){
+
+    TimerDisable(TIMER1_BASE, TIMER_A);
+
+    TimerConfigure(TIMER1_BASE, TIMER_CFG_PERIODIC); // 32-bit res
+    TimerLoadSet(TIMER1_BASE, TIMER_A, display_timer_period - 1);
+
+    // Register interrupt
+    TimerIntRegister(TIMER1_BASE, TIMER_A, display_interrupt_handler);
+    TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // Interrupt enable
+    TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // NVIC on timer 1A
+    IntPrioritySet(INT_TIMER1A, 0x40); // Prio 3 (Most sig. 3 bits)
+    IntEnable(INT_TIMER1A);
+    TimerEnable(TIMER1_BASE, TIMER_A);
+}
+
+void display_interrupt_handler(void){
+    // Clear interrupt flag 
+    TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+    update_display = true;
+}
+
+void warning_interrupt_handler(void){
+    TimerIntClear(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
+    // Timer ends! Motor has been running for 30 seconds non-stop...
+    warning_flag = !warning_flag;
+    warning_active = false;
+}
+
+// warning lights interrupt
+void warning_timer_interrupt(void){
+    TimerDisable(TIMER2_BASE, TIMER_A);
+
+    TimerConfigure(TIMER2_BASE, TIMER_CFG_ONE_SHOT);    // ONESHOT! 
+    TimerLoadSet(TIMER2_BASE, TIMER_A, warning_timer_period - 1);
+
+    // Register interrupt
+    TimerIntRegister(TIMER2_BASE, TIMER_A, warning_interrupt_handler);
+    TimerIntClear(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // Interrupt enable
+    TimerIntEnable(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
+    
+    // NVIC on timer 0A [NVIC savs the address of the handler]
+    IntEnable(INT_TIMER2A);
+    IntPrioritySet(INT_TIMER2A, 0x60); // Prio 4 (Most sig. 3 bits)
+
+    TimerEnable(TIMER2_BASE, TIMER_A);
+}
+
+void cancel_warning_timer(void) {
+    TimerDisable(TIMER2_BASE, TIMER_A);
+    TimerIntClear(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
+    warning_active = false; 
+}
+
+
+void calc_speed_dir(){ // triggers every 100ms
     rpm = (count / 0.1f ) * (60.0f / 2.0f); // number of revolutions per minute, 
     float speed_f = rpm * CIRCUMFERENCE * 0.06f;    // taking average within 100ms
 
-    //UARTprintf("RPM: %.2f, Speed: %.2f, Direction: %s\n", rpm, speed, directionForwards ? "V":"R"); // debug
     int rpm_i = (int)rpm;
     speed = (int)(speed_f * 100); // for two decimals in kmh !!100 MULTIPLE HERE!!
+
+    // IF timer hits 400 kmh(MAX SPEED), start
+    if (warning_flag == false){
+        if (speed >= 40000) {   // Multiple of 100 here! Consistent at MAX speed for 10 seconds
+            if (warning_active == false) {
+                warning_timer_interrupt(); // Start timer
+                warning_active = true;
+            }
+        } else {
+            if (warning_active == true) {
+                cancel_warning_timer(); 
+            }
+        }
+    } else { 
+        if (speed == 0) {
+            // Speed is zero, start countdown to turn off if not already started
+            if (warning_active == false) {
+                warning_timer_interrupt(); // Start timer
+                warning_active = true;
+            }
+        } else {
+            if (warning_active == true) {
+                cancel_warning_timer(); // Kill timer
+            }
+        }
+    }
 
     // Calculate distance travelled
     float delta_distance = 0;
@@ -155,30 +243,4 @@ void calc_speed_dir(){
 
     // Reset my calculation begin flag
     calc_flag = false;
-}
-
-void display_timer_interrupt(void){
-
-    TimerDisable(TIMER1_BASE, TIMER_A);
-
-    TimerConfigure(TIMER1_BASE, TIMER_CFG_PERIODIC); // 32-bit res
-    TimerLoadSet(TIMER1_BASE, TIMER_A, display_timer_period - 1);
-
-    // Register interrupt
-    TimerIntRegister(TIMER1_BASE, TIMER_A, display_interrupt_handler);
-    TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
-    
-    // Interrupt enable
-    TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
-    
-    // NVIC on timer 1A
-    IntPrioritySet(INT_TIMER1A, 0x40); // Prio 3 (Most sig. 3 bits)
-    IntEnable(INT_TIMER1A);
-    TimerEnable(TIMER1_BASE, TIMER_A);
-}
-
-void display_interrupt_handler(void){
-    // Clear interrupt flag 
-    TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
-    update_display = true;
 }

@@ -56,6 +56,9 @@
 #define XTSPD 382   // Starting X-coord for KM/H
 #define YTSPD 145   // Starting Y-coord for KM/H
 
+#define XWARN 388
+#define YWARN 350
+
 #define MAX_SPEED 400.0f
 #define CENTER_POINT_X 400
 #define CENTER_POINT_Y 280
@@ -81,6 +84,7 @@ int prev_x1 = 0;
 int prev_y1 = 0;
 static double c_speed = 0; // current speed, displayed on tacho
 static double e_speed = 0;
+static bool iconDrawn = false;
 /********************************************************************************/
 // Pixel map of digits
 /********************************************************************************/
@@ -112,6 +116,15 @@ static const uint8_t char_kmh[4][12] = {
     {0x00,0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x00,0x00,0x00}, // /
     {0x81,0x81,0x81,0x81,0xFF,0x81,0x81,0x81,0x81,0x81,0x81,0x00}  // H
 };
+
+// Bitmap :  engine temp warning
+static const uint8_t char_warning[4][12] = {
+    {0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01 }, // top-left
+    {0x80, 0x80, 0x80, 0xF8, 0x80,  0x80, 0xF8,0x80, 0x80, 0xF8, 0x80, 0x80 }, // top-right
+    {0x03, 0x57,0xAF, 0x07, 0x03,0x00, 0x00, 0x00, 0xDA,0x25, 0x00, 0x00 }, // bottom-left
+    {0xC0, 0xEA, 0xF5, 0xE0, 0xC0,  0x00, 0x00, 0x00, 0x5B, 0xA4,0x00, 0x00 }  // bottom-right
+};
+
 
 /********************************************************************************
  	 Elementary output functions  => speed optimized as inline
@@ -247,11 +260,7 @@ void fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t
         write_data(color & 0xFF);         // B
     }
 }
-
-void reset_background(void){    // for main to call
-    fill_rect(0, 0, MAX_X, MAX_Y, BLACK);
-}
-
+/*
 // same as fillrect(), but with defined end pixel coordinate
 void draw_pixels(uint32_t min_x, uint32_t min_y, uint32_t max_x, uint32_t max_y, uint32_t color){
     window_set(min_x, min_y, max_x, max_y);
@@ -269,7 +278,7 @@ void draw_pixels(uint32_t min_x, uint32_t min_y, uint32_t max_x, uint32_t max_y,
         write_data((color >> 8) & 0xFF);
         write_data(color & 0xFF);
     }
-}
+}*/
 
 // 1x1 window size
 void draw_pixel_single(uint32_t x, uint32_t y, uint32_t color) {
@@ -354,12 +363,12 @@ void draw_gauge_ticks(void) {
 */
 
 // --- ODOMETER ---
-void draw_char_km(int km, int x, int y, uint32_t color) {
+void draw_char(const uint8_t myarray[][12],int index, int x, int y, uint32_t color) {
     int row=0;
     int col=0;
     // draw row by row of digit bitmap
     for ( row = 0; row < 12; row++) {
-        uint8_t bits = char_kmh[km][row];
+        uint8_t bits = myarray[index][row];
         for ( col = 0; col < 8; col++) {
             if (bits & (1 << (7 - col))) {
                 draw_pixel_single(x + col, y + row, color);
@@ -407,12 +416,13 @@ void draw_odometer(float distance){
     
     // draw km
     for (j=0 ; j <2 ; j++){
-        draw_char_km(j, cursor, YODO, WHITE);
+        draw_char(char_kmh, j, cursor, YODO, WHITE);
         cursor += 9;
     }
 }
 
 // --- DIRECTION ---
+/*
 void draw_char_dir(int dir_f, int x, int y, uint32_t color) {
     int row=0;
     int col=0;
@@ -426,15 +436,16 @@ void draw_char_dir(int dir_f, int x, int y, uint32_t color) {
         }
     }
 }
+*/
 
 void draw_direction(bool directionForwards){
     // clear if directions different
     if(directionForwards != prev_dir){
         fill_rect(XDIR, YDIR, 20, 20, BLACK);
         if(directionForwards)   // forwards
-            draw_char_dir(directionForwards, XDIR, YDIR, WHITE);
+            draw_char(char_dir ,directionForwards, XDIR, YDIR, WHITE);
         else    // backwards
-            draw_char_dir(directionForwards, XDIR, YDIR, WHITE);
+            draw_char(char_dir, directionForwards, XDIR, YDIR, WHITE);
     }
     prev_dir = directionForwards;
 }
@@ -605,12 +616,47 @@ void bresenham_ticks(int x0, int y0){    // at r = 260, short = 5, long = 15
     int j = 0;
     int cursor = 0;
     for (j=0 ; j <4 ; j++){
-        draw_char_km(j, XTSPD + cursor, YTSPD, WHITE);
+        draw_char(char_kmh, j, XTSPD + cursor, YTSPD, WHITE);
         cursor += 9;
+    }
+
+    // engine temperature warning icon after 400km for >30s
+    if(warning_flag){
+        int xx = XWARN;
+        int yy = YWARN;
+        for(j = 0; j < 2 ; j++){
+            draw_char(char_warning,j, xx, yy,RED );
+            xx = xx + 8;
+        }
+        yy = yy + 12;
+        xx = XWARN;
+        for(j = 2; j < 4 ; j++){
+            draw_char(char_warning,j, xx,yy,RED );
+            xx = xx + 8;
+        }
+        iconDrawn = true;
+    } else if (iconDrawn && !warning_flag){ // after cooldown for 15 seconds without movement
+        int xx = XWARN;
+        int yy = YWARN;
+        for(j = 0; j < 2 ; j++){
+            draw_char(char_warning,j, xx, yy,BLACK );
+            xx = xx + 8;
+        }
+        yy = yy + 12;
+        xx = XWARN;
+        for(j = 2; j < 4 ; j++){
+            draw_char(char_warning,j, xx,yy,BLACK );
+            xx = xx + 8;
+        }
+        iconDrawn = false;
     }
 }
 
 /*For call from main*/
+void reset_background(void){  
+    fill_rect(0, 0, MAX_X, MAX_Y, BLACK);
+}
+
 void draw_arc(void){
     rasterArc(CENTER_POINT_X, CENTER_POINT_Y, OUTER_ARC_RAD);
 }

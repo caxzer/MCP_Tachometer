@@ -18,6 +18,7 @@
 // Macros
 #define WINDOW_MS 100
 #define DISPLAY_WINDOW_MS 50
+#define WARNING_LIMIT 30  // Seconds before warning light show up 
 #define MOTOR_S1 GPIO_PIN_0
 #define MOTOR_S2 GPIO_PIN_1
 #define MOTOR_PORT GPIO_PORTP_BASE
@@ -33,6 +34,7 @@ __error__(char *pcFilename, uint32_t ui32Line)
 uint32_t sysclk;
 uint32_t window_timer_period;
 uint32_t display_timer_period;
+uint32_t warning_timer_period;
 volatile bool update_display = false;
 
 void init_clock(void){
@@ -48,13 +50,20 @@ void init_timer(void){
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
     // Wait for Timer 0 to be ready
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0)){};
+    
     // Enable Timer 1
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
     // Wait for Timer 1 to be ready
     while (!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER1)){};
 
-    window_timer_period = sysclk / (1000 / WINDOW_MS);
-    display_timer_period = sysclk / (1000 / DISPLAY_WINDOW_MS);
+    // Enable Timer 2
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
+    // Wait for Timer 2 to be ready
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER2)){};
+
+    window_timer_period = sysclk / (1000 / WINDOW_MS); // 100ms
+    display_timer_period = sysclk / (1000 / DISPLAY_WINDOW_MS); // 50ms
+    warning_timer_period = sysclk / (1000 / 10e3); // 10 seconds into ms
 }
 
 void init_uart(void){
@@ -80,11 +89,11 @@ int main(void)
     init_uart();                    // Setup UART connection to PC for Debugging
     init_timer();                   // Setup timer
 
-    IntMasterDisable();              // Crucial: EN NVIC for whole board
+    IntMasterDisable();              // Crucial: NVIC for whole board
     init_motor_ports_interrupts();  // Setup ports for motors and enable their interrupts
     init_timer_interrupt();         // Enable interrupts for timer0 - window
     display_timer_interrupt();      // Enable interrupts for timer1 - display
-    IntMasterEnable();              // Crucial: EN NVIC for whole board
+    IntMasterEnable();              // Allow interrupts for CPU 
 
     init_ports_display();           // Init Port L for Display Control and Port M for Display Data
 	configure_display_controller_large();  // display init and configuration
