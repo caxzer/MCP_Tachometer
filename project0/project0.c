@@ -118,7 +118,7 @@ int main(void)
             draw_direction(directionForwards);
         }
         
-        // Display refresh every 20ms (50 Hz)
+        // Display refresh every 50ms (20 Hz)
         if(update_display){
             /*Draw needle with bresenham algo*/
             draw_bresenham(speed);
