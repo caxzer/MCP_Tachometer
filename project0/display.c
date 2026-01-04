@@ -38,34 +38,38 @@
 #define CHAR_HEIGHT 12  
 #define CHAR_WIDTH 8
 
-#define GAUGE_WIDTH 800         // Gauge spans 800 pixels (2 per speed unit)
-#define GAUGE_HEIGHT 240        // From which position the height of the gauge starts
-#define NEEDLE_HEIGHT 200       // Height of needle
-#define TICK_HEIGHT 5           // Height of gauge tick
+// Horizontal needle gauge
+// #define GAUGE_WIDTH 800         // Gauge spans 800 pixels (2 per speed unit)
+// #define GAUGE_HEIGHT 240        // From which position the height of the gauge starts
+// #define NEEDLE_HEIGHT 200       // Height of needle
+// #define TICK_HEIGHT 5           // Length of gauge tick
 
 #define SPEED_CHAR_HEIGHT 20    // Height of number characters beneath the gauge lines
 #define ODO_CHAR_HEIGHT 80      // Height of number characters of the Odometer and Direction
 
-#define XDIR 394
-#define YDIR 310
+#define XDIR 394    // Starting X-coord for direction
+#define YDIR 310    // Starting Y-coord for direction
 
-#define XODO 364
-#define YODO 330
+#define XODO 364    // Starting X-coord for Odometer
+#define YODO 330    // Starting Y-coord for Odometer
 
-#define XTSPD 382
-#define YTSPD 145
+#define XTSPD 382   // Starting X-coord for KM/H
+#define YTSPD 145   // Starting Y-coord for KM/H
 
-#define MAX_SPEED 400
+#define XWARN 388
+#define YWARN 350
+
+#define MAX_SPEED 400.0f
 #define CENTER_POINT_X 400
 #define CENTER_POINT_Y 280
-#define OUTER_ARC_RAD 270
-#define INNER_ARC_RAD 255
-#define NEEDLE_LENGTH 245
-#define NUM_TICKS 40            // Tick every 10 km/h
-#define SHORT_TICK 5
-#define LONG_TICK 15
-#define SPEED_STEP 10
-
+#define OUTER_ARC_RAD 270   // Radius for ticks arc
+#define INNER_ARC_RAD 255   // Radius for border arc
+#define NEEDLE_LENGTH 245   
+#define NUM_TICKS 40        // Tick every 10 km/h
+#define SHORT_TICK 5        // Length of short tick
+#define LONG_TICK 15        // Length of long tick
+#define SPEED_STEP 10       // Speedometer pos. where ticks are marked
+#define S_FACTOR 0.3f       // Slow smoothing factor for needle movement, 1.0 is instant
 
 /********************************************************************************/
 // Global Variables 
@@ -78,7 +82,9 @@ int colorarray[]={0x00000000,0x00FFFFFF,0x00AAAAAA,0x00FF0000,0x0000FF00,0x00000
 static bool prev_dir = 0;
 int prev_x1 = 0;
 int prev_y1 = 0;
-
+static double c_speed = 0; // current speed, displayed on tacho
+static double e_speed = 0;
+static bool iconDrawn = false;
 /********************************************************************************/
 // Pixel map of digits
 /********************************************************************************/
@@ -111,6 +117,15 @@ static const uint8_t char_kmh[4][12] = {
     {0x81,0x81,0x81,0x81,0xFF,0x81,0x81,0x81,0x81,0x81,0x81,0x00}  // H
 };
 
+// Bitmap :  engine temp warning
+static const uint8_t char_warning[4][12] = {
+    {0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01 }, // top-left
+    {0x80, 0x80, 0x80, 0xF8, 0x80,  0x80, 0xF8,0x80, 0x80, 0xF8, 0x80, 0x80 }, // top-right
+    {0x03, 0x57,0xAF, 0x07, 0x03,0x00, 0x00, 0x00, 0xDA,0x25, 0x00, 0x00 }, // bottom-left
+    {0xC0, 0xEA, 0xF5, 0xE0, 0xC0,  0x00, 0x00, 0x00, 0x5B, 0xA4,0x00, 0x00 }  // bottom-right
+};
+
+
 /********************************************************************************
  	 Elementary output functions  => speed optimized as inline
 *********************************************************************************/
@@ -133,7 +148,7 @@ inline void window_set(min_x, min_y, max_x, max_y)
     write_data(min_x);             // as above                     (low byte)
     write_data(max_x >> 8);        // Set stop address             (high byte)
     write_data(max_x);             // as above                     (low byte) 
-    write_command(0x2B);           // Set column address (y-axis)
+    write_command(0x2B);             // Set column address (y-axis)
     write_data(min_y >> 8);        // Set start column address     (high byte)
     write_data(min_y);             // as above                     (low byte)
     write_data(max_y >> 8);        // Set stop column address      (high byte)
@@ -245,11 +260,7 @@ void fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t
         write_data(color & 0xFF);         // B
     }
 }
-
-void reset_background(void){    // for main to call
-    fill_rect(0, 0, MAX_X, MAX_Y, BLACK);
-}
-
+/*
 // same as fillrect(), but with defined end pixel coordinate
 void draw_pixels(uint32_t min_x, uint32_t min_y, uint32_t max_x, uint32_t max_y, uint32_t color){
     window_set(min_x, min_y, max_x, max_y);
@@ -267,7 +278,7 @@ void draw_pixels(uint32_t min_x, uint32_t min_y, uint32_t max_x, uint32_t max_y,
         write_data((color >> 8) & 0xFF);
         write_data(color & 0xFF);
     }
-}
+}*/
 
 // 1x1 window size
 void draw_pixel_single(uint32_t x, uint32_t y, uint32_t color) {
@@ -305,7 +316,7 @@ void draw_digit_tacho(int digit, int x, int y, uint32_t color) {
     if (digit < 0 || digit > 9) return;
     int row=0;
     int col=0;
-    // draw line by line
+    // draw row by row of digit bitmap
     for ( row = 0; row < CHAR_HEIGHT; row++) {
         uint8_t bits = digit_tacho[digit][row];
         for ( col = 0; col < CHAR_WIDTH; col++) {
@@ -352,12 +363,12 @@ void draw_gauge_ticks(void) {
 */
 
 // --- ODOMETER ---
-void draw_char_km(int km, int x, int y, uint32_t color) {
+void draw_char(const uint8_t myarray[][12],int index, int x, int y, uint32_t color) {
     int row=0;
     int col=0;
     // draw row by row of digit bitmap
     for ( row = 0; row < 12; row++) {
-        uint8_t bits = char_kmh[km][row];
+        uint8_t bits = myarray[index][row];
         for ( col = 0; col < 8; col++) {
             if (bits & (1 << (7 - col))) {
                 draw_pixel_single(x + col, y + row, color);
@@ -373,9 +384,6 @@ void draw_odometer(float distance){
     char int_buf[4];
     char frac_buf[3];
 
-    // Format data to buffer
-    if (distance_int > 999) distance_int = 999; // maximal distance set to 999 (3 integers)
-    
     snprintf(int_buf, sizeof(int_buf), "%03d", distance_int);
     snprintf(frac_buf, sizeof(frac_buf), "%02d", distance_frac);
 
@@ -408,12 +416,13 @@ void draw_odometer(float distance){
     
     // draw km
     for (j=0 ; j <2 ; j++){
-        draw_char_km(j, cursor, YODO, WHITE);
+        draw_char(char_kmh, j, cursor, YODO, WHITE);
         cursor += 9;
     }
 }
 
 // --- DIRECTION ---
+/*
 void draw_char_dir(int dir_f, int x, int y, uint32_t color) {
     int row=0;
     int col=0;
@@ -427,15 +436,16 @@ void draw_char_dir(int dir_f, int x, int y, uint32_t color) {
         }
     }
 }
+*/
 
 void draw_direction(bool directionForwards){
     // clear if directions different
     if(directionForwards != prev_dir){
         fill_rect(XDIR, YDIR, 20, 20, BLACK);
         if(directionForwards)   // forwards
-            draw_char_dir(directionForwards, XDIR, YDIR, WHITE);
+            draw_char(char_dir ,directionForwards, XDIR, YDIR, WHITE);
         else    // backwards
-            draw_char_dir(directionForwards, XDIR, YDIR, WHITE);
+            draw_char(char_dir, directionForwards, XDIR, YDIR, WHITE);
     }
     prev_dir = directionForwards;
 }
@@ -494,16 +504,24 @@ void rasterArc(int x0, int y0, int radius)
     }
 }
 
-void bresenham_needle(int x0, int y0, uint32_t speed){
-    speed = speed /100; // Watch out: Speed is in factor of 100 here
-    double s = (double)speed;
+void bresenham_needle(int x0, int y0, uint32_t t_speed){
+    if (t_speed == 0) e_speed = - c_speed;      // e_speed = error speed : show difference of target and current shown speed
+    else e_speed = t_speed - c_speed;   // t_speed = target speed
+    
+    if (fabs(e_speed) < 1.0) { // small difference, speed jumps
+        c_speed = t_speed; 
+    } else {
+        c_speed += (e_speed * S_FACTOR); 
+    }
+    
+    double this_speed = c_speed /100; // Watch out: Speed is in factor of 100 here
 
-    if (s>(double)MAX_SPEED) s = (double)MAX_SPEED; 
+    if (this_speed > MAX_SPEED) this_speed = MAX_SPEED; 
     int r = NEEDLE_LENGTH;    // length of needle (almost) touching the arc
     
     // Find angle to the length of the arc ()
     double angle = 0.0f;
-    angle = (5.0/4.0)*M_PI - ((s/(double)MAX_SPEED) * (3.0/2.0)*M_PI); // adjust to 270 deg or 3/2*M_PI
+    angle = (5.0/4.0)*M_PI - ((this_speed/MAX_SPEED) * (3.0/2.0)*M_PI); // adjust to 270 deg or 3/2*M_PI
     int x1 = x0 + (int) r * cos(angle);
     int y1 = y0 - (int) r * sin(angle);
     
@@ -598,14 +616,47 @@ void bresenham_ticks(int x0, int y0){    // at r = 260, short = 5, long = 15
     int j = 0;
     int cursor = 0;
     for (j=0 ; j <4 ; j++){
-        draw_char_km(j, XTSPD + cursor, YTSPD, WHITE);
+        draw_char(char_kmh, j, XTSPD + cursor, YTSPD, WHITE);
         cursor += 9;
+    }
+
+    // engine temperature warning icon after 400km for >30s
+    if(warning_flag){
+        int xx = XWARN;
+        int yy = YWARN;
+        for(j = 0; j < 2 ; j++){
+            draw_char(char_warning,j, xx, yy,RED );
+            xx = xx + 8;
+        }
+        yy = yy + 12;
+        xx = XWARN;
+        for(j = 2; j < 4 ; j++){
+            draw_char(char_warning,j, xx,yy,RED );
+            xx = xx + 8;
+        }
+        iconDrawn = true;
+    } else if (iconDrawn && !warning_flag){ // after cooldown for 15 seconds without movement
+        int xx = XWARN;
+        int yy = YWARN;
+        for(j = 0; j < 2 ; j++){
+            draw_char(char_warning,j, xx, yy,BLACK );
+            xx = xx + 8;
+        }
+        yy = yy + 12;
+        xx = XWARN;
+        for(j = 2; j < 4 ; j++){
+            draw_char(char_warning,j, xx,yy,BLACK );
+            xx = xx + 8;
+        }
+        iconDrawn = false;
     }
 }
 
-
-
 /*For call from main*/
+void reset_background(void){  
+    fill_rect(0, 0, MAX_X, MAX_Y, BLACK);
+}
+
 void draw_arc(void){
     rasterArc(CENTER_POINT_X, CENTER_POINT_Y, OUTER_ARC_RAD);
 }

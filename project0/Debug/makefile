@@ -11,9 +11,9 @@ GEN_CMDS__FLAG :=
 
 ORDERED_OBJS += \
 "./display.obj" \
+"./interrupt.obj" \
 "./project0.obj" \
 "./startup_ccs.obj" \
-"./tacho.obj" \
 "./uartstdio.obj" \
 "../project0_ccs.cmd" \
 $(GEN_CMDS__FLAG) \
@@ -147,8 +147,8 @@ project0.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)
-	-$(RM) "display.obj" "project0.obj" "startup_ccs.obj" "tacho.obj" "uartstdio.obj" 
-	-$(RM) "display.d" "project0.d" "startup_ccs.d" "tacho.d" "uartstdio.d" 
+	-$(RM) "display.obj" "interrupt.obj" "project0.obj" "startup_ccs.obj" "uartstdio.obj" 
+	-$(RM) "display.d" "interrupt.d" "project0.d" "startup_ccs.d" "uartstdio.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

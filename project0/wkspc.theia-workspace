@@ -1,0 +1,11 @@
+{
+  "folders": [
+    {
+      "path": "file:///c%3A/Users/T495s/Documents/GitHub/MCP_Tachometer"
+    }
+  ],
+  "settings": {
+    "CCS.debug.serial.options.localEcho": false,
+    "CCS.debug.serial.options.sendCharactersOnEnter": false
+  }
+}

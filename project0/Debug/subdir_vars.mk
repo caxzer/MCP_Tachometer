@@ -10,44 +10,44 @@ CMD_SRCS += \
 
 C_SRCS += \
 ../display.c \
+../interrupt.c \
 ../project0.c \
 ../startup_ccs.c \
-../tacho.c \
 ../uartstdio.c 
 
 C_DEPS += \
 ./display.d \
+./interrupt.d \
 ./project0.d \
 ./startup_ccs.d \
-./tacho.d \
 ./uartstdio.d 
 
 OBJS += \
 ./display.obj \
+./interrupt.obj \
 ./project0.obj \
 ./startup_ccs.obj \
-./tacho.obj \
 ./uartstdio.obj 
 
 OBJS__QUOTED += \
 "display.obj" \
+"interrupt.obj" \
 "project0.obj" \
 "startup_ccs.obj" \
-"tacho.obj" \
 "uartstdio.obj" 
 
 C_DEPS__QUOTED += \
 "display.d" \
+"interrupt.d" \
 "project0.d" \
 "startup_ccs.d" \
-"tacho.d" \
 "uartstdio.d" 
 
 C_SRCS__QUOTED += \
 "../display.c" \
+"../interrupt.c" \
 "../project0.c" \
 "../startup_ccs.c" \
-"../tacho.c" \
 "../uartstdio.c" 
 
 
