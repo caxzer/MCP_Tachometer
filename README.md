@@ -7,8 +7,6 @@ Zhi Hao Tan (2654650)
 ---Ola Ayoub (-)
 
 Projektstruktur
-main.c
-|
--interrupt.c & interrupt.h
-|
+- main.c
+- interrupt.c & interrupt.h
 - display.c & display.h
